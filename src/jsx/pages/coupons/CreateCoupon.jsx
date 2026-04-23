@@ -1,10 +1,12 @@
 import React, { useRef, useState } from "react";
 import Select from "react-select";
 import { DatePicker } from "rsuite";
-import html2canvas from "html2canvas";
 
 import PageTitle from "../../layouts/PageTitle";
-import { createCoupon } from "../../../services/CouponService";
+import {
+  createCoupon,
+  downloadCouponPdf,
+} from "../../../services/CouponService";
 
 const discountOptions = [
   { value: "restaurant-the bridge", label: "Restaurant" },
@@ -28,6 +30,11 @@ const CreateCoupon = () => {
   const [qrPreview, setQrPreview] = useState("");
   const [couponLink, setCouponLink] = useState("");
   const [loading, setLoading] = useState(false);
+  const [pdfWidthIn, setPdfWidthIn] = useState(6);
+  const [pdfHeightIn, setPdfHeightIn] = useState(4);
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfPreviewLoading, setPdfPreviewLoading] = useState(false);
+  const pdfPreviewUrlRef = useRef(null);
   const previewRef = useRef(null);
 
   const hotelInfo = {
@@ -55,6 +62,30 @@ const CreateCoupon = () => {
     }
   };
 
+  const getPdfSizeForRequest = () => {
+    const widthRaw = window.prompt(
+      "Enter coupon PDF width (inches)",
+      String(pdfWidthIn || 3),
+    );
+    const heightRaw = window.prompt(
+      "Enter coupon PDF height (inches)",
+      String(pdfHeightIn || 2),
+    );
+
+    const widthParsed = Number(widthRaw);
+    const heightParsed = Number(heightRaw);
+
+    const widthIn =
+      Number.isFinite(widthParsed) && widthParsed > 0 ? widthParsed : 3;
+    const heightIn =
+      Number.isFinite(heightParsed) && heightParsed > 0 ? heightParsed : 2;
+
+    return {
+      widthIn,
+      heightIn,
+    };
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     setMessage("");
@@ -80,6 +111,8 @@ const CreateCoupon = () => {
         expiry,
         usageLimit: Number(usageLimit),
         status: status.value,
+        pdfWidthIn: Number(pdfWidthIn),
+        pdfHeightIn: Number(pdfHeightIn),
       };
       const response = await createCoupon(payload, token);
       setQrPreview(response.data.qrCodeDataUrl);
@@ -98,30 +131,52 @@ const CreateCoupon = () => {
     setMessage("Coupon link copied to clipboard.");
   };
 
+  const fetchCouponPdfBlob = async (size) => {
+    if (!code) {
+      throw new Error("Coupon code is required");
+    }
+    const response = await downloadCouponPdf(code, {
+      widthIn: size.widthIn,
+      heightIn: size.heightIn,
+    });
+    return response.data;
+  };
+
   const downloadCouponCard = async () => {
-    if (!previewRef.current) return;
+    setPdfLoading(true);
     try {
-      const canvas = await html2canvas(previewRef.current, {
-        scale: 2,
-        backgroundColor: null,
-        useCORS: true,
-      });
-      const blob = await new Promise((resolve) =>
-        canvas.toBlob(resolve, "image/png"),
-      );
-      if (!blob) {
-        throw new Error("Unable to generate image");
-      }
+      const size = getPdfSizeForRequest();
+      const blob = await fetchCouponPdfBlob(size);
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `${code || "coupon"}-coupon.png`;
+      link.download = `${code || "coupon"}-coupon.pdf`;
       document.body.appendChild(link);
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
     } catch (error) {
-      setMessage("Unable to download coupon preview. Please try again.");
+      setMessage("Unable to download coupon PDF. Please try again.");
+    } finally {
+      setPdfLoading(false);
+    }
+  };
+
+  const previewCouponPdf = async () => {
+    setPdfPreviewLoading(true);
+    try {
+      const size = getPdfSizeForRequest();
+      const blob = await fetchCouponPdfBlob(size);
+      if (pdfPreviewUrlRef.current) {
+        URL.revokeObjectURL(pdfPreviewUrlRef.current);
+      }
+      const url = URL.createObjectURL(blob);
+      pdfPreviewUrlRef.current = url;
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      setMessage("Unable to open coupon PDF preview. Please try again.");
+    } finally {
+      setPdfPreviewLoading(false);
     }
   };
 
@@ -279,8 +334,8 @@ const CreateCoupon = () => {
                         width: "100%",
                         borderRadius: 28,
                         background: "linear-gradient(145deg, #1e293b, #0f172a)",
-                        border: "3px solid rgba(255,255,255,0.85)",
                         boxShadow: "0 18px 36px -10px rgba(0, 0, 0, 0.45)",
+                        fontFamily: "Poppins, sans-serif",
                       }}
                     >
                       <div
@@ -299,6 +354,7 @@ const CreateCoupon = () => {
                             style={{
                               fontSize: 32,
                               letterSpacing: "0.16em",
+                              fontFamily: "Poppins, sans-serif",
                               background:
                                 "linear-gradient(90deg, #bf953f, #fcf6ba, #b38728, #fbf5b7, #aa771c)",
                               WebkitBackgroundClip: "text",
@@ -308,8 +364,8 @@ const CreateCoupon = () => {
                             CLARKS INN
                           </h1>
                           <div
-                            className="d-flex align-items-start justify-content-center text-gray-300 mb-2"
-                            style={{ fontSize: 12, lineHeight: 1.4 }}
+                            className="d-flex align-items-start justify-content-center text-gray-300 mb-3"
+                            style={{ fontSize: 13, lineHeight: 1.5 }}
                           >
                             <svg
                               width="16"
@@ -323,8 +379,13 @@ const CreateCoupon = () => {
                             <p
                               className="mb-0"
                               style={{
-                                color: "rgba(255,255,255,0.72)",
+                                fontFamily: "Poppins, sans-serif",
+                                background:
+                                  "linear-gradient(90deg, #bf953f, #fcf6ba, #b38728, #fbf5b7, #aa771c)",
+                                WebkitBackgroundClip: "text",
+                                WebkitTextFillColor: "transparent",
                                 marginLeft: 8,
+                                textAlign: "center",
                               }}
                             >
                               {hotelInfo.address}
@@ -332,7 +393,15 @@ const CreateCoupon = () => {
                           </div>
                           <p
                             className="mb-0 text-white fw-bold"
-                            style={{ fontSize: 12, opacity: 0.88 }}
+                            style={{
+                              fontSize: 13,
+                              opacity: 0.88,
+                              fontFamily: "Poppins, sans-serif",
+                              background:
+                                "linear-gradient(90deg, #bf953f, #fcf6ba, #b38728, #fbf5b7, #aa771c)",
+                              WebkitBackgroundClip: "text",
+                              WebkitTextFillColor: "transparent",
+                            }}
                           >
                             📞 {hotelInfo.phone}
                           </p>
@@ -353,8 +422,9 @@ const CreateCoupon = () => {
                             className="fw-bold mb-2"
                             style={{
                               fontSize: 64,
-                              marginBottom: 8,
+                              marginBottom: 12,
                               letterSpacing: "-0.04em",
+                              fontFamily: "Poppins, sans-serif",
                               background:
                                 "linear-gradient(90deg, #bf953f, #fcf6ba, #b38728, #fbf5b7, #aa771c)",
                               WebkitBackgroundClip: "text",
@@ -386,21 +456,30 @@ const CreateCoupon = () => {
                         </div>
 
                         <div
-                          className="d-flex flex-column flex-sm-row align-items-center justify-content-center gap-2 px-3 py-4"
+                          className="d-flex flex-column align-items-center justify-content-center gap-3 px-5 py-4 mt-4"
                           style={{
                             background: "#0f172a",
                           }}
                         >
-                          <img
-                            src={qrPreview}
-                            alt="Coupon QR"
+                          <div
                             style={{
-                              width: 180,
-                              height: 180,
-                              display: "block",
+                              background: "#fff",
+                              borderRadius: 16,
+                              padding: 8,
+                              boxShadow: "inset 0 0 12px rgba(0,0,0,0.08)",
                             }}
-                          />
-                          <div style={{ textAlign: "left", minWidth: 180 }}>
+                          >
+                            <img
+                              src={qrPreview}
+                              alt="Coupon QR"
+                              style={{
+                                width: 180,
+                                height: 180,
+                                display: "block",
+                              }}
+                            />
+                          </div>
+                          <div style={{ textAlign: "center", minWidth: 220 }}>
                             {minOrder > 0 && (
                               <p
                                 className="text-uppercase mb-2"
@@ -411,7 +490,9 @@ const CreateCoupon = () => {
                                   margin: 0,
                                 }}
                               >
-                                Minimum order: ₹{minOrder}
+                                {discountType.value === "restaurant-the bridge"
+                                  ? `Minimum Order: ₹${minOrder}`
+                                  : `Minimum ${minOrder} Room Booking`}
                               </p>
                             )}
                             <p
@@ -441,6 +522,48 @@ const CreateCoupon = () => {
                       </div>
                     </div>
                     <div className="d-flex justify-content-center gap-2 mt-3 flex-wrap">
+                      <div className="d-flex align-items-center gap-2">
+                        <label className="mb-0 md" style={{ fontSize: "15px" }}>
+                          PDF Size (inches)
+                        </label>
+                        <span
+                          className="text-muted md"
+                          style={{ fontSize: "15px" }}
+                        >
+                          Height
+                        </span>
+                        <input
+                          type="number"
+                          min="2"
+                          max="12"
+                          step="0.1"
+                          className="form-control form-control-sm"
+                          style={{ width: 90 }}
+                          value={pdfHeightIn}
+                          onChange={(event) =>
+                            setPdfHeightIn(event.target.value)
+                          }
+                        />
+                        <span
+                          className="text-muted"
+                          style={{ fontSize: "15px" }}
+                        >
+                          Width
+                        </span>
+                        <input
+                          type="number"
+                          min="2"
+                          max="12"
+                          step="0.1"
+                          className="form-control form-control-sm"
+                          style={{ width: 90 }}
+                          value={pdfWidthIn}
+                          onChange={(event) =>
+                            setPdfWidthIn(event.target.value)
+                          }
+                        />
+                        {/* <span>x</span> */}
+                      </div>
                       <button
                         type="button"
                         className="btn btn-outline-primary"
@@ -452,8 +575,17 @@ const CreateCoupon = () => {
                         type="button"
                         className="btn btn-outline-success"
                         onClick={downloadCouponCard}
+                        disabled={pdfLoading}
                       >
-                        Download Coupon
+                        {pdfLoading ? "Downloading..." : "Download PDF"}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-outline-dark"
+                        onClick={previewCouponPdf}
+                        disabled={pdfPreviewLoading}
+                      >
+                        {pdfPreviewLoading ? "Opening..." : "Preview PDF"}
                       </button>
                     </div>
                   </div>

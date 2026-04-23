@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import html2canvas from "html2canvas";
 
 import PageTitle from "../../layouts/PageTitle";
-import { fetchAdminCoupons } from "../../../services/CouponService";
+import {
+  downloadCouponPdf,
+  fetchAdminCoupons,
+} from "../../../services/CouponService";
 
 const AllCoupons = () => {
   const [coupons, setCoupons] = useState([]);
@@ -14,7 +16,7 @@ const AllCoupons = () => {
   const [qrLoading, setQrLoading] = useState(false);
   const [qrError, setQrError] = useState("");
   const [couponError, setCouponError] = useState("");
-  const downloadRefs = useRef({});
+  const pdfPreviewUrlRef = useRef(null);
   const qrPreviewRef = useRef(null);
 
   const getAdminToken = () => {
@@ -53,66 +55,69 @@ const AllCoupons = () => {
 
   const closeModal = () => setModalCoupon(null);
 
+  const getPdfSizeForRequest = () => {
+    const widthRaw = window.prompt("Enter coupon PDF width (inches)", "3");
+    const heightRaw = window.prompt("Enter coupon PDF height (inches)", "2");
+
+    const widthParsed = Number(widthRaw);
+    const heightParsed = Number(heightRaw);
+
+    const widthIn =
+      Number.isFinite(widthParsed) && widthParsed > 0 ? widthParsed : 3;
+    const heightIn =
+      Number.isFinite(heightParsed) && heightParsed > 0 ? heightParsed : 2;
+
+    return {
+      widthIn,
+      heightIn,
+    };
+  };
+
+  const fetchPdfBlob = async (coupon, size) => {
+    const response = await downloadCouponPdf(coupon.code, {
+      widthIn: size.widthIn,
+      heightIn: size.heightIn,
+    });
+    return response.data;
+  };
+
   const downloadQrCode = async (coupon) => {
     setQrLoading(true);
     setQrError("");
 
     try {
-      const element = qrPreviewRef.current;
-      if (!element) {
-        throw new Error("Preview element not available");
-      }
-
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        backgroundColor: null,
-        useCORS: true,
-      });
-      const blob = await new Promise((resolve) =>
-        canvas.toBlob(resolve, "image/png"),
-      );
-      if (!blob) throw new Error("Unable to generate coupon image");
+      const size = getPdfSizeForRequest();
+      const blob = await fetchPdfBlob(coupon, size);
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `${coupon.code}-coupon.png`;
+      link.download = `clarksinn-coupon-${coupon.code}.pdf`;
       document.body.appendChild(link);
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
     } catch (err) {
-      setQrError("Unable to download coupon preview. Please try again.");
+      setQrError("Unable to download coupon PDF. Please try again.");
     } finally {
       setQrLoading(false);
     }
   };
 
-  const captureCouponImage = async (coupon) => {
-    const element = downloadRefs.current[coupon.code];
-    if (!element) return;
+  const previewPdf = async (coupon) => {
     setCouponLoading(true);
     setCouponError("");
 
     try {
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        backgroundColor: "#ffffff",
-        useCORS: true,
-      });
-      const blob = await new Promise((resolve) =>
-        canvas.toBlob(resolve, "image/png"),
-      );
-      if (!blob) throw new Error("Unable to generate image");
+      const size = getPdfSizeForRequest();
+      const blob = await fetchPdfBlob(coupon, size);
+      if (pdfPreviewUrlRef.current) {
+        URL.revokeObjectURL(pdfPreviewUrlRef.current);
+      }
       const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `clarksinn-coupon-${coupon.code}.png`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
+      pdfPreviewUrlRef.current = url;
+      window.open(url, "_blank", "noopener,noreferrer");
     } catch (err) {
-      setCouponError("Unable to download coupon card. Please try again.");
+      setCouponError("Unable to preview coupon PDF. Please try again.");
     } finally {
       setCouponLoading(false);
     }
@@ -124,13 +129,217 @@ const AllCoupons = () => {
       "Opp. Amayra City Center, Kharar-Kurali Highway, Kharar, Mohali, Punjab-140301",
     phone: "+91 77101 08081",
   };
-  const defaultCoupon = coupons[0] || {};
 
   const getAppliedOnLabel = (type) => {
     if (type === "room") return "Room";
     if (type === "restaurant-the bridge") return "Restaurant-The Bridge";
     return type || "Room / Restaurant";
   };
+
+  const renderCouponCard = (coupon, ref, width, minHeight) => (
+    <div
+      ref={ref}
+      style={{
+        width,
+        minHeight,
+        margin: "0 auto",
+        borderRadius: 24,
+        overflow: "hidden",
+        position: "relative",
+        background:
+          "linear-gradient(150deg, #0b1220 0%, #141f35 56%, #0a1222 100%)",
+        boxShadow: "0 24px 50px rgba(0,0,0,0.45)",
+        color: "#fff",
+        fontFamily: "Poppins, sans-serif",
+      }}
+    >
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background:
+            "radial-gradient(circle at 100% 0%, rgba(251,191,36,0.20), transparent 36%), radial-gradient(circle at 0% 100%, rgba(148,163,184,0.18), transparent 32%)",
+          pointerEvents: "none",
+        }}
+      />
+
+      <div
+        style={{
+          position: "relative",
+          padding: "30px 32px 18px",
+          textAlign: "center",
+        }}
+      >
+        <h1
+          style={{
+            margin: 0,
+            fontSize: 36,
+            letterSpacing: "0.18em",
+            lineHeight: 1,
+            fontWeight: 800,
+            fontFamily: "Poppins, sans-serif",
+            background:
+              "linear-gradient(90deg, #bf953f, #fcf6ba, #b38728, #fbf5b7, #aa771c)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+          }}
+        >
+          CLARKS INN
+        </h1>
+        <p
+          style={{
+            margin: "10px 0 0",
+            fontSize: 13,
+            lineHeight: 1.55,
+            fontFamily: "Poppins, sans-serif",
+            background:
+              "linear-gradient(90deg, #bf953f, #fcf6ba, #b38728, #fbf5b7, #aa771c)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+          }}
+        >
+          {coupon.hotelInfo?.address || hotelInfo.address}
+        </p>
+        <p
+          style={{
+            margin: "6px 0 0",
+            fontSize: 13,
+            fontFamily: "Poppins, sans-serif",
+            fontWeight: 700,
+            background:
+              "linear-gradient(90deg, #bf953f, #fcf6ba, #b38728, #fbf5b7, #aa771c)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+          }}
+        >
+          Phone:{" "}
+          {coupon.hotelInfo?.phone || hotelInfo.phone || "+91 77101 08081"}
+        </p>
+      </div>
+
+      <div
+        style={{
+          position: "relative",
+          padding: "6px 32px 14px",
+          textAlign: "center",
+        }}
+      >
+        <p
+          style={{
+            margin: 0,
+            fontSize: 11,
+            letterSpacing: "0.2em",
+            color: "rgba(255,255,255,0.72)",
+            textTransform: "uppercase",
+            fontWeight: 700,
+          }}
+        >
+          Exclusive Offer
+        </p>
+        <h2
+          style={{
+            margin: "6px 0 14px",
+            fontSize: 52,
+            lineHeight: 1,
+            letterSpacing: "-0.03em",
+            fontWeight: 900,
+            fontFamily: "Poppins, sans-serif",
+            background:
+              "linear-gradient(90deg, #bf953f, #fcf6ba, #b38728, #fbf5b7, #aa771c)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+          }}
+        >
+          {coupon.discountType === "percent"
+            ? `${coupon.value}% OFF`
+            : `Flat ₹${coupon.value} OFF`}
+        </h2>
+        <p
+          style={{
+            margin: "0 0 3px",
+            fontSize: 15,
+            textTransform: "uppercase",
+            letterSpacing: "0.14em",
+            fontWeight: 800,
+          }}
+        >
+          Coupon {coupon.code}
+        </p>
+        <p
+          style={{
+            margin: 0,
+            fontSize: 12,
+            color: "#e2e8f0",
+            letterSpacing: "0.05em",
+          }}
+        >
+          Applied on: {getAppliedOnLabel(coupon.discountType)}
+        </p>
+      </div>
+
+      <div
+        style={{
+          position: "relative",
+          marginTop: 14,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 12,
+          padding: "18px 24px 24px",
+          background: "rgba(2, 6, 23, 0.82)",
+          borderTop: "1px solid rgba(251,191,36,0.2)",
+        }}
+      >
+        <div
+          style={{
+            background: "#fff",
+            borderRadius: 14,
+            padding: 8,
+            boxShadow: "inset 0 0 12px rgba(0,0,0,0.08)",
+          }}
+        >
+          <img
+            src={getQrUrl(coupon.code)}
+            alt={`${coupon.code} QR code`}
+            style={{ width: 186, height: 186, display: "block" }}
+          />
+        </div>
+        <div style={{ textAlign: "center", minWidth: 230 }}>
+          {coupon.minOrder > 0 && (
+            <p
+              style={{
+                margin: "0 0 8px",
+                fontSize: 11,
+                color: "#94a3b8",
+                letterSpacing: "0.04em",
+                textTransform: "uppercase",
+              }}
+            >
+              Minimum order: ₹{coupon.minOrder}
+            </p>
+          )}
+          <p
+            style={{
+              margin: "0 0 6px",
+              fontSize: 11,
+              color: "#fff",
+              fontWeight: 800,
+              letterSpacing: "0.04em",
+            }}
+          >
+            VALID UNTIL:{" "}
+            {coupon.expiry
+              ? new Date(coupon.expiry).toLocaleDateString()
+              : "N/A"}
+          </p>
+          <p style={{ margin: 0, fontSize: 10, color: "#94a3b8" }}>
+            Scan and claim your discount
+          </p>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <>
@@ -152,7 +361,7 @@ const AllCoupons = () => {
                     <p className="mb-0 text-muted">{hotelInfo.address}</p>
                   </div>
                   <div>
-                    <p className="mb-1 mb-md-0">
+                    {/* <p className="mb-1 mb-md-0">
                       <strong>Discount Type:</strong>{" "}
                       {defaultCoupon.discountType || "Room / Restaurant"}
                     </p>
@@ -161,7 +370,31 @@ const AllCoupons = () => {
                       {defaultCoupon.expiry
                         ? new Date(defaultCoupon.expiry).toLocaleDateString()
                         : "Varies by coupon"}
-                    </p>
+                    </p> */}
+                    {/* <div className="d-flex gap-2 mt-2 align-items-center">
+                      <label className="mb-0 small">PDF Size (in)</label>
+                      <input
+                        type="number"
+                        min="2"
+                        max="12"
+                        step="0.1"
+                        className="form-control form-control-sm"
+                        style={{ width: 90 }}
+                        value={pdfWidthIn}
+                        onChange={(event) => setPdfWidthIn(event.target.value)}
+                      />
+                      <span>x</span>
+                      <input
+                        type="number"
+                        min="2"
+                        max="12"
+                        step="0.1"
+                        className="form-control form-control-sm"
+                        style={{ width: 90 }}
+                        value={pdfHeightIn}
+                        onChange={(event) => setPdfHeightIn(event.target.value)}
+                      />
+                    </div> */}
                   </div>
                 </div>
               </div>
@@ -169,6 +402,7 @@ const AllCoupons = () => {
               {loading && <p>Loading coupons...</p>}
               {error && <p className="text-danger">{error}</p>}
               {couponError && <p className="text-danger">{couponError}</p>}
+              {qrError && <p className="text-danger">{qrError}</p>}
               {!loading && coupons.length === 0 && (
                 <p>No coupons found. Create one using the button above.</p>
               )}
@@ -223,17 +457,6 @@ const AllCoupons = () => {
                               >
                                 Preview QR
                               </button>
-                              {/* <button
-                                style={{ fontSize: "14px" }}
-                                type="button"
-                                className="btn btn-md btn-success"
-                                onClick={() => captureCouponImage(coupon)}
-                                disabled={couponLoading}
-                              >
-                                {couponLoading
-                                  ? "Downloading..."
-                                  : "Download Coupon Card"}
-                              </button> */}
                             </td>
                           </tr>
                         </React.Fragment>
@@ -246,228 +469,6 @@ const AllCoupons = () => {
           </div>
         </div>
       </div>
-
-      {coupons.map((coupon) => {
-        const hotelName = coupon.hotelInfo?.name || hotelInfo.name;
-        const phone =
-          coupon.hotelInfo?.phone || hotelInfo.phone || "+91 77101 08081";
-        const address = coupon.hotelInfo?.address || hotelInfo.address;
-        const discountType =
-          coupon.discountType ||
-          defaultCoupon.discountType ||
-          "Room / Restaurant";
-        const validity = coupon.expiry
-          ? new Date(coupon.expiry).toLocaleDateString()
-          : "Varies by coupon";
-
-        return (
-          <div
-            key={`hidden-${coupon.code}`}
-            ref={(el) => {
-              if (el) downloadRefs.current[coupon.code] = el;
-            }}
-            style={{
-              position: "absolute",
-              top: -9999,
-              left: -9999,
-              width: 760,
-              padding: 32,
-              background: "#ffffff",
-              color: "#111",
-              borderRadius: 28,
-              boxShadow: "0 40px 80px rgba(0,0,0,0.12)",
-              fontFamily:
-                "Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
-              textAlign: "center",
-            }}
-          >
-            <div style={{ marginBottom: 24 }}>
-              <div
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: "8px 18px",
-                  borderRadius: 999,
-                  background: "rgba(59,130,246,0.12)",
-                  color: "#2563eb",
-                  fontWeight: 700,
-                  letterSpacing: "0.16em",
-                  fontSize: 12,
-                  textTransform: "uppercase",
-                }}
-              >
-                Exclusive Hotel Offer
-              </div>
-            </div>
-            <h1
-              style={{
-                fontSize: 44,
-                margin: 0,
-                lineHeight: 1.05,
-                fontWeight: 800,
-                letterSpacing: "-0.04em",
-              }}
-            >
-              {hotelName}
-            </h1>
-            <p
-              style={{
-                margin: "10px auto 28px",
-                maxWidth: 640,
-                color: "#475569",
-                fontSize: 16,
-                lineHeight: 1.7,
-              }}
-            >
-              {address}
-            </p>
-            <div
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 10,
-                marginBottom: 28,
-              }}
-            >
-              <span
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  width: 46,
-                  height: 46,
-                  borderRadius: 999,
-                  background: "#0f172a",
-                  color: "#f8fafc",
-                  fontSize: 20,
-                }}
-              >
-                📞
-              </span>
-              <span style={{ fontSize: 16, fontWeight: 700, color: "#111" }}>
-                {phone}
-              </span>
-            </div>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: 20,
-                marginBottom: 28,
-              }}
-            >
-              <div
-                style={{
-                  padding: 24,
-                  borderRadius: 24,
-                  background: "#f8fafc",
-                  border: "1px solid #e2e8f0",
-                  textAlign: "center",
-                }}
-              >
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: 12,
-                    letterSpacing: "0.12em",
-                    color: "#64748b",
-                    textTransform: "uppercase",
-                    marginBottom: 8,
-                  }}
-                >
-                  Discount Type
-                </p>
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: 18,
-                    fontWeight: 800,
-                    color: "#111827",
-                    textTransform: "capitalize",
-                  }}
-                >
-                  {discountType}
-                </p>
-              </div>
-              <div
-                style={{
-                  padding: 24,
-                  borderRadius: 24,
-                  background: "#f8fafc",
-                  border: "1px solid #e2e8f0",
-                  textAlign: "center",
-                }}
-              >
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: 12,
-                    letterSpacing: "0.12em",
-                    color: "#64748b",
-                    textTransform: "uppercase",
-                    marginBottom: 8,
-                  }}
-                >
-                  Validity
-                </p>
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: 18,
-                    fontWeight: 800,
-                    color: "#111827",
-                  }}
-                >
-                  {validity}
-                </p>
-              </div>
-            </div>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr",
-                gap: 24,
-                alignItems: "center",
-                justifyItems: "center",
-              }}
-            >
-              <div
-                style={{
-                  padding: 24,
-                  borderRadius: 24,
-                  background: "#0f172a",
-                  color: "#fff",
-                  width: "100%",
-                }}
-              >
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: 12,
-                    letterSpacing: "0.14em",
-                    textTransform: "uppercase",
-                    opacity: 0.75,
-                  }}
-                >
-                  Coupon Code
-                </p>
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: 28,
-                    fontWeight: 800,
-                    letterSpacing: "0.12em",
-                  }}
-                >
-                  {coupon.code}
-                </p>
-              </div>
-            </div>
-          </div>
-        );
-      })}
-
       {modalCoupon && (
         <div
           className="modal fade show d-block"
@@ -483,175 +484,7 @@ const AllCoupons = () => {
           >
             <div className="modal-content bg-transparent border-0 shadow-none">
               <div className="modal-body p-0">
-                <div
-                  ref={qrPreviewRef}
-                  className="overflow-hidden position-relative mx-auto"
-                  style={{
-                    maxWidth: 640,
-                    borderRadius: 32,
-                    background: "linear-gradient(145deg, #1e293b, #0f172a)",
-                    border: "4px solid rgba(255,255,255,0.85)",
-                    boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
-                  }}
-                >
-                  <div
-                    style={{
-                      position: "absolute",
-                      inset: 0,
-                      background:
-                        "radial-gradient(circle at top right, rgba(255,255,255,0.18), transparent 28%), radial-gradient(circle at bottom left, rgba(251,191,36,0.18), transparent 18%)",
-                      pointerEvents: "none",
-                    }}
-                  />
-                  <div className="position-relative text-white">
-                    <div className="pt-5 pb-3 px-4 text-center">
-                      <h1
-                        className="fw-bold mb-2"
-                        style={{
-                          fontSize: 32,
-                          letterSpacing: "0.16em",
-                          background:
-                            "linear-gradient(90deg, #bf953f, #fcf6ba, #b38728, #fbf5b7, #aa771c)",
-                          WebkitBackgroundClip: "text",
-                          WebkitTextFillColor: "transparent",
-                        }}
-                      >
-                        CLARKS INN
-                      </h1>
-                      <div
-                        className="d-flex align-items-start justify-content-center text-gray-300 mb-2"
-                        style={{ fontSize: 12, lineHeight: 1.4 }}
-                      >
-                        <svg
-                          width="16"
-                          height="16"
-                          viewBox="0 0 20 20"
-                          fill="currentColor"
-                          style={{ color: "#facc15", flexShrink: 0 }}
-                        >
-                          <path d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" />
-                        </svg>
-
-                        <p
-                          className="mb-0"
-                          style={{
-                            color: "rgba(255,255,255,0.72)",
-                            marginLeft: 8,
-                          }}
-                        >
-                          {modalCoupon.hotelInfo?.address || hotelInfo.address}
-                        </p>
-                      </div>
-                      <p
-                        className="mb-0 text-white fw-bold"
-                        style={{ fontSize: 12, opacity: 0.88 }}
-                      >
-                        📞{" "}
-                        {modalCoupon.hotelInfo?.phone ||
-                          hotelInfo.phone ||
-                          "+91 77101 08081"}
-                      </p>
-                    </div>
-
-                    <div className="px-4 sm:px-5 mt-4 text-center">
-                      <p
-                        className="text-uppercase mb-2 fw-bold"
-                        style={{
-                          fontSize: 10,
-                          letterSpacing: "0.2em",
-                          color: "rgba(255,255,255,0.72)",
-                        }}
-                      >
-                        Exclusive Offer
-                      </p>
-                      <h2
-                        className="fw-bold mb-2"
-                        style={{
-                          fontSize: 48,
-                          marginBottom: 8,
-                          letterSpacing: "-0.04em",
-                          background:
-                            "linear-gradient(90deg, #bf953f, #fcf6ba, #b38728, #fbf5b7, #aa771c)",
-                          WebkitBackgroundClip: "text",
-                          WebkitTextFillColor: "transparent",
-                        }}
-                      >
-                        {modalCoupon.discountType === "percent"
-                          ? `${modalCoupon.value}% OFF`
-                          : `Flat ₹${modalCoupon.value} OFF`}
-                      </h2>
-                      <p
-                        className="fw-bold text-uppercase"
-                        style={{
-                          fontSize: 14,
-                          letterSpacing: "0.18em",
-                          color: "#fff",
-                        }}
-                      >
-                        Coupon {modalCoupon.code}
-                      </p>
-                      <p
-                        className="mb-2"
-                        style={{
-                          fontSize: 12,
-                          letterSpacing: "0.08em",
-                          color: "#f8fafc",
-                        }}
-                      >
-                        Applied on:{" "}
-                        {getAppliedOnLabel(modalCoupon.discountType)}
-                      </p>
-                    </div>
-
-                    <div
-                      className="d-flex flex-column flex-sm-row align-items-center justify-content-center gap-3 px-3 py-4"
-                      style={{ background: "#0f172a" }}
-                    >
-                      <img
-                        src={getQrUrl(modalCoupon.code)}
-                        alt={`${modalCoupon.code} QR code`}
-                        style={{ width: 180, height: 180, display: "block" }}
-                      />
-                      <div style={{ textAlign: "left", minWidth: 180 }}>
-                        {modalCoupon.minOrder > 0 && (
-                          <p
-                            className="text-uppercase mb-2"
-                            style={{
-                              fontSize: 10,
-                              color: "#94a3b8",
-                              letterSpacing: "0.02em",
-                              margin: 0,
-                            }}
-                          >
-                            Minimum order: ₹{modalCoupon.minOrder}
-                          </p>
-                        )}
-                        <p
-                          className="fw-bold mb-1"
-                          style={{
-                            fontSize: 10,
-                            color: "#fff",
-                            letterSpacing: "0.02em",
-                          }}
-                        >
-                          VALID UNTIL:{" "}
-                          {modalCoupon.expiry
-                            ? new Date(modalCoupon.expiry).toLocaleDateString()
-                            : "N/A"}
-                        </p>
-                        <p
-                          style={{
-                            fontSize: 9,
-                            color: "#94a3b8",
-                            margin: 0,
-                          }}
-                        >
-                          Scan and claim your discount
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                {renderCouponCard(modalCoupon, qrPreviewRef, 700, 470)}
               </div>
               <div className="modal-footer justify-content-center bg-transparent border-0 mt-3">
                 <button
@@ -663,11 +496,19 @@ const AllCoupons = () => {
                 </button>
                 <button
                   type="button"
+                  className="btn btn-outline-primary"
+                  onClick={() => previewPdf(modalCoupon)}
+                  disabled={couponLoading}
+                >
+                  {couponLoading ? "Opening..." : "Preview PDF"}
+                </button>
+                <button
+                  type="button"
                   className="btn btn-primary"
                   onClick={() => downloadQrCode(modalCoupon)}
                   disabled={qrLoading}
                 >
-                  {qrLoading ? "Downloading..." : "Download Coupon"}
+                  {qrLoading ? "Downloading..." : "Download PDF"}
                 </button>
               </div>
             </div>

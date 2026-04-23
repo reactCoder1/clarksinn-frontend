@@ -2,8 +2,8 @@ import React, { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import axios from "axios";
 import { Turnstile } from "@marsidev/react-turnstile";
-import html2canvas from "html2canvas";
 import logo from "../../../assets/images/logo-full.png";
+import { downloadCouponPdf as fetchCouponPdf } from "../../../services/CouponService";
 
 const CouponPage = () => {
   const [searchParams] = useSearchParams();
@@ -25,7 +25,10 @@ const CouponPage = () => {
   const [message, setMessage] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [downloadError, setDownloadError] = useState("");
+  const [downloadLoading, setDownloadLoading] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const couponCardRef = useRef(null);
+  const pdfPreviewUrlRef = useRef(null);
 
   useEffect(() => {
     if (!code) {
@@ -47,32 +50,51 @@ const CouponPage = () => {
       .finally(() => setLoading(false));
   }, [code, apiUrl]);
 
-  const downloadCouponImage = async () => {
-    if (!couponCardRef.current) return;
+  const fetchCouponPdfBlob = async () => {
+    if (!code) {
+      throw new Error("Coupon code is required");
+    }
+    const response = await fetchCouponPdf(code);
+    return response.data;
+  };
+
+  const handleDownloadCouponPdf = async () => {
     setDownloadError("");
+    setDownloadLoading(true);
 
     try {
-      const canvas = await html2canvas(couponCardRef.current, {
-        scale: 2,
-        backgroundColor: null,
-        useCORS: true,
-      });
-      const blob = await new Promise((resolve) =>
-        canvas.toBlob(resolve, "image/png"),
-      );
-      if (!blob) {
-        throw new Error("Unable to generate image");
-      }
+      const blob = await fetchCouponPdfBlob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `clarksinn-coupon-${code}.png`;
+      link.download = `clarksinn-coupon-${code}.pdf`;
       document.body.appendChild(link);
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
     } catch (err) {
-      setDownloadError("Unable to download coupon. Please try again.");
+      setDownloadError("Unable to download coupon PDF. Please try again.");
+    } finally {
+      setDownloadLoading(false);
+    }
+  };
+
+  const previewCouponPdf = async () => {
+    setDownloadError("");
+    setPreviewLoading(true);
+
+    try {
+      const blob = await fetchCouponPdfBlob();
+      if (pdfPreviewUrlRef.current) {
+        URL.revokeObjectURL(pdfPreviewUrlRef.current);
+      }
+      const url = URL.createObjectURL(blob);
+      pdfPreviewUrlRef.current = url;
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      setDownloadError("Unable to preview coupon PDF. Please try again.");
+    } finally {
+      setPreviewLoading(false);
     }
   };
 
@@ -450,18 +472,29 @@ const CouponPage = () => {
               </div>
 
               <div className="text-center mt-4 px-3">
-                <button
-                  type="button"
-                  className="btn btn-lg text-white fw-bold rounded-pill px-5 py-3"
-                  style={{
-                    background: "#0f172a",
-                    boxShadow: "0 20px 40px rgba(0, 0, 0, 0.25)",
-                    border: "1px solid #f3eaa9",
-                  }}
-                  onClick={downloadCouponImage}
-                >
-                  Download Coupon
-                </button>
+                <div className="d-flex justify-content-center flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-lg text-white fw-bold rounded-pill px-5 py-3"
+                    style={{
+                      background: "#0f172a",
+                      boxShadow: "0 20px 40px rgba(0, 0, 0, 0.25)",
+                      border: "1px solid #f3eaa9",
+                    }}
+                    onClick={handleDownloadCouponPdf}
+                    disabled={downloadLoading}
+                  >
+                    {downloadLoading ? "Downloading..." : "Download PDF"}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline-dark rounded-pill px-4"
+                    onClick={previewCouponPdf}
+                    disabled={previewLoading}
+                  >
+                    {previewLoading ? "Opening..." : "Preview PDF"}
+                  </button>
+                </div>
               </div>
               {downloadError && (
                 <p className="text-danger text-center mt-3">{downloadError}</p>
