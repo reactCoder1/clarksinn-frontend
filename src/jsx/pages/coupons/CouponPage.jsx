@@ -141,7 +141,7 @@ const CouponPage = () => {
   const hotelAddress =
     coupon?.hotelInfo?.address ||
     "Opp. Amayra City Center, Kharar-Kurali Highway, Kharar, Mohali, Punjab 140301";
-  const hotelPhone = coupon?.hotelInfo?.phone || "+91 77101 08081";
+  const hotelPhone = coupon?.hotelInfo?.phone || "+91-77101-08081";
   const discountLabel =
     coupon?.discountType === "percent"
       ? `${coupon?.value}% OFF`

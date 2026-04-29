@@ -41,7 +41,7 @@ const CreateCoupon = () => {
     name: "Clarks Inn",
     address:
       "Opp. Amayra City Center, Kharar-Kurali Highway, Kharar, Mohali, Punjab-140301",
-    phone: "+91 77101 08081",
+    phone: "+91-77101-08081",
   };
 
   const discountAppliedLabel =
@@ -522,7 +522,7 @@ const CreateCoupon = () => {
                       </div>
                     </div>
                     <div className="d-flex justify-content-center gap-2 mt-3 flex-wrap">
-                      <div className="d-flex align-items-center gap-2">
+                      {/* <div className="d-flex align-items-center gap-2">
                         <label className="mb-0 md" style={{ fontSize: "15px" }}>
                           PDF Size (inches)
                         </label>
@@ -562,8 +562,8 @@ const CreateCoupon = () => {
                             setPdfWidthIn(event.target.value)
                           }
                         />
-                        {/* <span>x</span> */}
-                      </div>
+                     
+                      </div> */}
                       <button
                         type="button"
                         className="btn btn-outline-primary"

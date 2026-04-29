@@ -127,7 +127,7 @@ const AllCoupons = () => {
     name: "Clarks Inn",
     address:
       "Opp. Amayra City Center, Kharar-Kurali Highway, Kharar, Mohali, Punjab-140301",
-    phone: "+91 77101 08081",
+    phone: "+91-77101-08081",
   };
 
   const getAppliedOnLabel = (type) => {
