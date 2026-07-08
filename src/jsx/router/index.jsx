@@ -30,6 +30,10 @@ import CouponPage from "../pages/coupons/CouponPage";
 import EditProfessor from "../pages/coupons/EditProfessor";
 import ProfileProfessor from "../pages/coupons/ProfileProfessor";
 
+//Feedback QR
+import FeedbackAdmin from "../pages/feedback/FeedbackAdmin";
+import FeedbackRestaurantAdmin from "../pages/feedbackrestaurant/RestFeedbackAdmin";
+
 //Student
 import AllStudent from "./../pages/students/AllStudent";
 import AddStudent from "./../pages/students/AddStudent";
@@ -171,6 +175,13 @@ const Markup = () => {
     { url: "coupon", component: <CouponPage /> },
     // { url: "edit-professor", component: <EditProfessor/> },
     // { url: "professor-profile", component: <ProfileProfessor/> },
+
+    //Feedback QR
+    { url: "feedback-admin", component: <FeedbackAdmin /> },
+    {
+      url: "restaurant-feedback-admin",
+      component: <FeedbackRestaurantAdmin />,
+    },
 
     //Student
     // { url: "all-students", component: <AllStudent/> },

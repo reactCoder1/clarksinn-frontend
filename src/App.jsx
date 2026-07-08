@@ -2,6 +2,8 @@ import { lazy, Suspense, useEffect } from "react";
 /// Components
 import Index from "./jsx/router/index";
 import CouponPage from "./jsx/pages/coupons/CouponPage";
+import FeedbackLandingPage from "./jsx/pages/feedback/FeedbackLandingPage";
+import RestFeedbackLandingPage from "./jsx/pages/feedbackrestaurant/RestFeedbackLandingPage";
 import { connect, useDispatch } from "react-redux";
 import {
   Route,
@@ -41,12 +43,32 @@ function App(props) {
   const navigate = useNavigate();
   const { location } = props.router;
   const isPublicCouponRoute = location.pathname === "/coupon";
+  const isPublicFeedbackRoute = location.pathname === "/feedback";
+  const isPublicRestaurantFeedbackRoute =
+    location.pathname === "/restaurant-feedback";
   useEffect(() => {
-    if (!isPublicCouponRoute) checkAutoLogin(dispatch, navigate);
-  }, [isPublicCouponRoute]);
+    if (
+      !isPublicCouponRoute &&
+      !isPublicFeedbackRoute &&
+      !isPublicRestaurantFeedbackRoute
+    )
+      checkAutoLogin(dispatch, navigate);
+  }, [
+    isPublicCouponRoute,
+    isPublicFeedbackRoute,
+    isPublicRestaurantFeedbackRoute,
+  ]);
 
   if (isPublicCouponRoute) {
     return <CouponPage />;
+  }
+
+  if (isPublicFeedbackRoute) {
+    return <FeedbackLandingPage />;
+  }
+
+  if (isPublicRestaurantFeedbackRoute) {
+    return <RestFeedbackLandingPage />;
   }
 
   let routeblog = (

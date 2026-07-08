@@ -57,6 +57,17 @@ export const MenuList = [
       // },
     ],
   },
+  //Feedback QR
+  {
+    title: "Feedback QR",
+    to: "/feedback-admin",
+    iconStyle: <i className="la la-qrcode" />,
+  },
+  {
+    title: "Restaurant Feedback QR",
+    to: "/restaurant-feedback-admin",
+    iconStyle: <i className="la la-qrcode" />,
+  },
   //Student
   //   {
   //     title: "Students",
