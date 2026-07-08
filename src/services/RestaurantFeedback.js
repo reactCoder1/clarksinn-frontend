@@ -14,20 +14,20 @@ const authHeaders = (token) => ({
 });
 
 export const fetchPublicRestaurantFeedbackConfig = () =>
-  api.get("/restaurant/api/feedback/config");
+  api.get("/api/restaurant/feedback/config");
 
 export const fetchAdminRestaurantFeedbackConfig = (token) =>
-  api.get("/restaurant/admin/feedback/config", authHeaders(token));
+  api.get("/admin/restaurant/feedback/config", authHeaders(token));
 
 export const generateRestaurantFeedbackQrPng = (sizePx, token) =>
-  api.get("/restaurant/admin/feedback/qrcode/png", {
+  api.get("/admin/restaurant/feedback/qrcode/png", {
     ...authHeaders(token),
     params: { sizePx },
     responseType: "blob",
   });
 
 export const logRestaurantFeedbackClick = (platform) =>
-  api.post("/restaurant/api/feedback/click", { platform });
+  api.post("/api/restaurant/feedback/click", { platform });
 
 export const fetchRestaurantFeedbackClickSummary = (token) =>
-  api.get("/restaurant/admin/feedback/clicks/summary", authHeaders(token));
+  api.get("/admin/restaurant/feedback/clicks/summary", authHeaders(token));
